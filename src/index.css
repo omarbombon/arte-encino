@@ -1,0 +1,14 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: #f4f1ec;
+  min-height: 100vh;
+  color: #1a1a1a;
+}
+
+h1, h2, h3, h4 { font-family: 'Syne', sans-serif; }
+
+input, select, button, textarea { font-family: 'DM Sans', sans-serif; }
