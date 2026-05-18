@@ -2,6 +2,17 @@
 
 App de inscripciones para talleres artísticos.
 
+## Administración
+
+Desde el panel admin puedes:
+
+- Crear talleres nuevos
+- Editar nombre, descripción, emoji, color, cupo y materiales
+- Activar u ocultar talleres para nuevas inscripciones
+- Limitar cada taller por grupo escolar y editar cupos por grupo
+- Quitar talleres sin borrar registros históricos de alumnos
+- Exportar inscritos a CSV
+
 ## Cómo subir a Vercel
 
 ### Opción A — Sin instalar nada (recomendada)
@@ -29,3 +40,8 @@ npx vercel --prod
 Ya está configurado con el proyecto `arte-encino-2026`.
 Asegúrate de que en Firestore las reglas permitan lectura/escritura
 en modo de prueba (válido 30 días).
+
+La app usa estas colecciones:
+
+- `registrations`: inscripciones de alumnos
+- `workshops`: talleres administrables desde el panel
