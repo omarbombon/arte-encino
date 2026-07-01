@@ -13,18 +13,24 @@ const APP_ID = 'arte-encino-2026';
 const ADMIN_PASSWORD = 'admin_encino_2026';
 
 const GRADE_GROUPS = [
-  { id: '3', label: '3º Grado' },
-  { id: '4', label: '4º Grado' },
-  { id: '5', label: '5º Grado' },
-  { id: '6', label: '6º Grado' },
-  { id: '7', label: '7º Grado' },
-  { id: '8', label: '8º Grado' },
-  { id: '9-10', label: '9º y 10º Grado' },
-  { id: '11-12', label: '11º y 12º Grado' },
+  { id: '3', label: '3° ES', level: 'ES' },
+  { id: '4', label: '4° ES', level: 'ES' },
+  { id: '5', label: '5° JS', level: 'JS' },
+  { id: '6', label: '6° JS', level: 'JS' },
+  { id: '7', label: '7° JS', level: 'JS' },
+  { id: '8', label: '8° JS', level: 'JS' },
+  { id: '9-10', label: '9° y 10° HS', level: 'HS' },
+  { id: '11-12', label: '11° y 12° HS', level: 'HS' },
+];
+const SCHOOL_LEVELS = [
+  { id: 'ES', label: 'Elementary School (ES)', gradeIds: ['3', '4'] },
+  { id: 'JS', label: 'Junior School (JS)', gradeIds: ['5', '6', '7', '8'] },
+  { id: 'HS', label: 'High School (HS)', gradeIds: ['9-10', '11-12'] },
 ];
 const GRADES = GRADE_GROUPS.map((g) => g.label);
 const ALL_GRADES = GRADE_GROUPS.map((g) => g.id);
 const DEFAULT_GRADE_CAPS = Object.fromEntries(ALL_GRADES.map((id) => [id, 10]));
+const INSTITUTIONAL_EMAIL_DOMAIN = '@encino.edu.mx';
 
 const DEFAULT_WORKSHOPS = [
   {
@@ -115,10 +121,22 @@ const emptyWorkshop = {
 };
 
 function gradeId(label) {
-  if (!label) return '';
-  if (label.includes('9')) return '9-10';
-  if (label.includes('11') || label.includes('12')) return '11-12';
-  return label.replace('º Grado', '');
+  const text = String(label || '').toLowerCase();
+  if (!text) return '';
+  if (text.includes('11') || text.includes('12')) return '11-12';
+  if (text.includes('9') || text.includes('10')) return '9-10';
+  if (text.includes('8')) return '8';
+  if (text.includes('7')) return '7';
+  if (text.includes('6')) return '6';
+  if (text.includes('5')) return '5';
+  if (text.includes('4')) return '4';
+  if (text.includes('3')) return '3';
+  return '';
+}
+
+function expandGradeIds(value) {
+  const id = gradeId(value);
+  return id ? [id] : [];
 }
 
 function fmtDate(ts) {
@@ -140,12 +158,14 @@ function slugify(value) {
 
 function normalizeWorkshop(id, data) {
   const rawGradeIds = Array.isArray(data.gradeIds) ? data.gradeIds : ALL_GRADES;
-  const gradeIds = [...new Set(rawGradeIds.map((grade) => gradeId(String(grade))).filter(Boolean))]
+  const gradeIds = [...new Set(rawGradeIds.flatMap((grade) => expandGradeIds(grade)).filter(Boolean))]
     .filter((grade) => ALL_GRADES.includes(grade));
   const savedCaps = data.gradeCaps || {};
   const gradeCaps = {
     ...DEFAULT_GRADE_CAPS,
-    ...Object.fromEntries(Object.entries(savedCaps).map(([grade, cap]) => [gradeId(String(grade)), cap])),
+    ...Object.fromEntries(
+      Object.entries(savedCaps).flatMap(([grade, cap]) => expandGradeIds(grade).map((id) => [id, cap]))
+    ),
   };
   const max = gradeIds.reduce((sum, grade) => sum + Math.max(0, Number(gradeCaps[grade] || data.max || 10)), 0);
   return {
@@ -194,6 +214,27 @@ function capacityForGroup(workshop, grade) {
   return Math.max(0, Number(workshop.gradeCaps?.[id] || 0));
 }
 
+function gradesForLevel(levelId) {
+  const level = SCHOOL_LEVELS.find((item) => item.id === levelId);
+  return GRADE_GROUPS.filter((grade) => level?.gradeIds.includes(grade.id));
+}
+
+function gradeLevelLabel(grade) {
+  const id = gradeId(grade);
+  const group = GRADE_GROUPS.find((item) => item.id === id);
+  return SCHOOL_LEVELS.find((level) => level.id === group?.level)?.id || '';
+}
+
+function gradeLabelWithLevel(grade) {
+  const id = gradeId(grade);
+  const group = GRADE_GROUPS.find((item) => item.id === id);
+  return group?.label || grade;
+}
+
+function isInstitutionalEmail(email) {
+  return String(email).trim().toLowerCase().endsWith(INSTITUTIONAL_EMAIL_DOMAIN);
+}
+
 function csvEscape(value) {
   const text = String(value ?? '');
   return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
@@ -240,6 +281,11 @@ function StudentView({ workshops, registrations, onGoAdmin }) {
     if (!selected || !selectedGrade || !form.name.trim() || !form.email.trim()) return;
 
     const normalizedEmail = form.email.trim().toLowerCase();
+    if (!isInstitutionalEmail(normalizedEmail)) {
+      setNotice(`Usa tu correo institucional terminado en ${INSTITUTIONAL_EMAIL_DOMAIN}.`);
+      return;
+    }
+
     const duplicate = registrations.some((r) =>
       r.workshopId === selected.id && String(r.userEmail || '').toLowerCase() === normalizedEmail
     );
@@ -320,16 +366,24 @@ function StudentView({ workshops, registrations, onGoAdmin }) {
         {step === 'pick' && (
           <>
             <section className="intro-block">
-              <p className="eyebrow">Arte y Cultura Encino</p>
-              <h2>Inscripciones 2026</h2>
-              <p>Elige tu grado y toma uno de los lugares disponibles.</p>
+              <img className="intro-image" src="/assets/arte-cultura-hero.jpeg" alt="Arte y Cultura Encino" />
+              <div className="intro-copy">
+                <h2>Inscripciones 2026</h2>
+                <p>Elige tu grado y toma uno de los lugares disponibles.</p>
+              </div>
             </section>
 
             <section className="grade-strip">
               <label>Grado escolar</label>
               <select value={selectedGrade} onChange={(e) => chooseGrade(e.target.value)}>
                 <option value="">Selecciona grado...</option>
-                {GRADES.map((grade) => <option key={grade} value={grade}>{grade}</option>)}
+                {SCHOOL_LEVELS.map((level) => (
+                  <optgroup key={level.id} label={level.label}>
+                    {gradesForLevel(level.id).map((grade) => (
+                      <option key={grade.id} value={grade.label}>{grade.label}</option>
+                    ))}
+                  </optgroup>
+                ))}
               </select>
             </section>
 
@@ -416,7 +470,9 @@ function StudentView({ workshops, registrations, onGoAdmin }) {
                 <input
                   required
                   type="email"
-                  placeholder="correo@ejemplo.com"
+                  pattern=".+@encino\.edu\.mx"
+                  title="Usa tu correo institucional @encino.edu.mx"
+                  placeholder="nombre@encino.edu.mx"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                 />
@@ -469,8 +525,15 @@ function AdminView({ workshops, registrations, onGoStudent }) {
 
   function exportCSV() {
     const rows = [
-      ['Nombre', 'Grado', 'Taller', 'Email', 'Fecha'],
-      ...registrations.map((r) => [r.userName, r.grade, r.workshopTitle, r.userEmail, fmtDate(r.timestamp)]),
+      ['Nombre', 'Grado', 'Nivel', 'Taller', 'Email', 'Fecha'],
+      ...registrations.map((r) => [
+        r.userName,
+        r.grade,
+        gradeLevelLabel(r.grade),
+        r.workshopTitle,
+        r.userEmail,
+        fmtDate(r.timestamp),
+      ]),
     ];
     const csv = rows.map((row) => row.map(csvEscape).join(',')).join('\n');
     const a = document.createElement('a');
@@ -527,7 +590,13 @@ function AdminView({ workshops, registrations, onGoStudent }) {
               </select>
               <select value={filterG} onChange={(e) => setFilterG(e.target.value)}>
                 <option value="all">Todos los grados</option>
-                {GRADES.map((g) => <option key={g} value={g}>{g}</option>)}
+                {SCHOOL_LEVELS.map((level) => (
+                  <optgroup key={level.id} label={level.label}>
+                    {gradesForLevel(level.id).map((grade) => (
+                      <option key={grade.id} value={grade.label}>{grade.label}</option>
+                    ))}
+                  </optgroup>
+                ))}
               </select>
               <span>{filtered.length} resultado{filtered.length === 1 ? '' : 's'}</span>
             </div>
@@ -610,7 +679,7 @@ function StudentTable({ rows, workshops, onDelete }) {
             return (
               <tr key={r.id}>
                 <td><strong>{r.userName}</strong><small>{r.userEmail}</small></td>
-                <td>{r.grade}</td>
+                <td>{gradeLabelWithLevel(r.grade)}</td>
                 <td><span className="tag" style={getWorkshopHue(workshop?.color || '#555')}>{r.workshopTitle}</span></td>
                 <td>{fmtDate(r.timestamp)}</td>
                 <td>
@@ -793,23 +862,27 @@ function WorkshopForm({ value, onChange, onCancel, onSave }) {
           <button type="button" onClick={() => patch({ gradeIds: [] })}>Ninguno</button>
         </div>
         <div className="grade-cap-grid">
-          {GRADES.map((grade) => {
-            const id = gradeId(grade);
-            const checked = value.gradeIds?.includes(id);
-            return (
-              <label className={checked ? 'checked' : ''} key={grade}>
-                <input type="checkbox" checked={checked} onChange={() => toggleGrade(id)} />
-                <span>{grade}</span>
-                <input
-                  type="number"
-                  min="0"
-                  value={(value.gradeCaps || DEFAULT_GRADE_CAPS)[id] || 0}
-                  onChange={(e) => setGradeCapacity(id, e.target.value)}
-                  disabled={!checked}
-                />
-              </label>
-            );
-          })}
+          {SCHOOL_LEVELS.map((level) => (
+            <div className="grade-level-group" key={level.id}>
+              <h4>{level.label}</h4>
+              {gradesForLevel(level.id).map((grade) => {
+                const checked = value.gradeIds?.includes(grade.id);
+                return (
+                  <label className={checked ? 'checked' : ''} key={grade.id}>
+                    <input type="checkbox" checked={checked} onChange={() => toggleGrade(grade.id)} />
+                    <span>{grade.label}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={(value.gradeCaps || DEFAULT_GRADE_CAPS)[grade.id] || 0}
+                      onChange={(e) => setGradeCapacity(grade.id, e.target.value)}
+                      disabled={!checked}
+                    />
+                  </label>
+                );
+              })}
+            </div>
+          ))}
         </div>
       </div>
 
